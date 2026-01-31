@@ -188,16 +188,13 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 }
 ```
 
-### Auto-Dump Setup
-
 ```json
 // .mcp2cli/.settings.json
 {
-  "dump_dir": "docs_output",
-  "dump_threshold": 0,
   "servers": {
     "context7": {
-      "dump_threshold": 0
+      "dump_threshold": 500,
+      "dump_call_args": true
     }
   }
 }
@@ -205,12 +202,101 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 
 ### Usage
 
+We use on-demand mode here since Context7 doesn't hold meaningful state between calls—it just fetches docs. For stateful servers like Chrome DevTools MCP (which maintains browser session state), daemon mode would be the better choice.
+
 ```bash
 # Initialize
 uvx mcp2cli clt init context7
 
-# Query docs - automatically saved to docs_output/
-uvx mcp2cli context7 query-docs --libraryId "/vercel/next.js" --query "app router"
+# Query docs - automatically saved to feature-x-tmp/
+uvx mcp2cli context7 --output feature-x-tmp query-docs --libraryId "/vercel/next.js" --query "app router"
+```
+
+```
+$ uvx mcp2cli context7 --help
+Usage: mcp2cli context7 [OPTIONS] COMMAND [ARGS]...
+
+  Tools for context7 server
+
+Options:
+  --json         Output raw JSON response.
+  --output PATH  Write JSON result to file.
+  --help         Show this message and exit.
+
+Commands:
+  query-docs          Retrieves and queries up-to-date documentation and...
+  resolve-library-id  Resolves a package/product name to a...
+```
+
+```
+$ uvx mcp2cli context7 --output feature-x-tmp query-docs --libraryId /vercel/next.js --query "How to set up authentication with JWT"
+Tool executed successfully.
+Tool output written to: feature-x-tmp/context7_query-docs_20260131_194608.json
+```
+
+```json
+// feature-x-tmp/context7_query-docs_20260131_194608.json
+{
+  "tool_call": {
+    "server": "context7",
+    "tool": "query-docs",
+    "arguments": {
+      "libraryId": "/vercel/next.js",
+      "query": "How to set up authentication with JWT"
+    }
+  },
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "### Encrypt and Decrypt Sessions with Jose in Next.js\n\n
+                Source: https://github.com/vercel/next.js/blob/canary/docs/...\n\n
+                Implements JWT-based session encryption and decryption using
+                the Jose library with HS256 algorithm...\n\n
+                ```typescript\nimport 'server-only'\nimport { SignJWT, jwtVerify }
+                from 'jose'\n...```\n\n
+                --------------------------------\n\n
+                ### Set Encrypted Session Cookie in Next.js...\n\n
+                ... (5000+ tokens of documentation)"
+      }
+    ],
+    "isError": false
+  }
+}
+```
+
+With `dump_call_args: true`, the output includes the exact tool call arguments. This turns output files into a cache that AI agents can refer back to—no need to re-fetch the same documentation during a session.
+
+```
+$ uvx mcp2cli context7 query-docs --help
+Usage: mcp2cli context7 query-docs [OPTIONS]
+
+  Retrieves and queries up-to-date documentation and code examples from
+  Context7 for any programming library or framework.
+
+  You must call 'resolve-library-id' first to obtain the exact
+  Context7-compatible library ID required to use this tool, UNLESS the user
+  explicitly provides a library ID in the format '/org/project' or
+  '/org/project/version' in their query.
+
+  IMPORTANT: Do not call this tool more than 3 times per question. If you
+  cannot find what you need after 3 calls, use the best information you have.
+
+Options:
+  --libraryId TEXT  Exact Context7-compatible library ID (e.g.,
+                    '/mongodb/docs', '/vercel/next.js', '/supabase/supabase',
+                    '/vercel/next.js/v14.3.0-canary.87') retrieved from
+                    'resolve-library-id' or directly from user query in the
+                    format '/org/project' or '/org/project/version'.
+                    [required]
+  --query TEXT      The question or task you need help with. Be specific and
+                    include relevant details. Good: 'How to set up
+                    authentication with JWT in Express.js' or 'React useEffect
+                    cleanup function examples'. Bad: 'auth' or 'hooks'.
+                    IMPORTANT: Do not include any sensitive or confidential
+                    information such as API keys, passwords, credentials, or
+                    personal data in your query.  [required]
+  --help            Show this message and exit.
 ```
 
 With `dump_threshold: 0`, every Context7 response saves to `docs_output/`, keeping your AI context lean while preserving full documentation access.
