@@ -234,30 +234,6 @@ def stop(server: str) -> None:
         click.echo(f"Server '{server}' is not running")
 
 
-@clt.command()
-@click.argument("server", required=False)
-def status(server: str | None) -> None:
-    """Show status of MCP servers.
-
-    SERVER is optional. If provided, shows status of that server only.
-    """
-    from nomcp.services import ServerManager
-
-    manager = ServerManager()
-    statuses = manager.status(server)
-
-    if not statuses:
-        click.echo("No servers registered")
-        return
-
-    for name, info in statuses.items():
-        if info:
-            mode = "persistent" if info.socket_path else "running"
-            click.echo(f"{name}: {mode} (PID: {info.pid})")
-        else:
-            click.echo(f"{name}: stopped")
-
-
 @clt.command(name="list")
 def list_servers() -> None:
     """List configured MCP servers."""
@@ -285,7 +261,11 @@ def list_servers() -> None:
     # Build table data
     rows = []
     for name, config in servers.items():
-        status = "running" if statuses.get(name) else "stopped"
+        info = statuses.get(name)
+        if info:
+            status = "persistent" if info.socket_path else "running"
+        else:
+            status = "stopped"
         command = f"{config.command} {' '.join(config.args)}"
         rows.append((name, status, command))
 
