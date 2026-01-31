@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import click
+from mcp.types import CallToolRequestParams, CallToolResult
 
 from nomcp import __version__
 
@@ -20,7 +21,7 @@ class DynamicServerGroup(click.Group):
             return cmd
 
         # Check if it's a server name
-        from nomcp.mcp_client import load_tools_cache
+        from nomcp.utils import load_tools_cache
 
         cache = load_tools_cache(cmd_name)
         if cache is None:
@@ -52,28 +53,41 @@ class DynamicServerGroup(click.Group):
 
         return server_group
 
+    def _map_arguments(
+        self, kwargs: dict[str, Any], name_mapping: dict[str, str]
+    ) -> dict[str, Any]:
+        """Map Click kwargs to MCP argument names, filtering None values."""
+        arguments = {}
+        for click_name, value in kwargs.items():
+            if value is not None:
+                mcp_name = name_mapping.get(click_name, click_name)
+                arguments[mcp_name] = value
+        return arguments
+
     def _create_tool_command(self, server_name: str, tool: Any) -> click.Command:
         """Create a Click command for a tool."""
         from nomcp.services import ToolRunner
 
         # Build parameters from input schema
-        params = self._build_params_from_schema(tool.inputSchema)
+        params, name_mapping = self._build_params_from_schema(tool.inputSchema)
 
         @click.pass_context
         def tool_callback(ctx: click.Context, **kwargs: Any) -> None:
             json_output = ctx.obj.get("json_output", False)
             output_path = ctx.obj.get("output_path")
-            # Filter out None values
-            arguments = {k: v for k, v in kwargs.items() if v is not None}
+            arguments = self._map_arguments(kwargs, name_mapping)
 
             runner = ToolRunner()
             try:
-                result = runner.call(server_name, tool.name, arguments or None)
-            except (RuntimeError, KeyError) as e:
+                request = CallToolRequestParams(
+                    name=tool.name, arguments=arguments or None
+                )
+                result = runner.call(server_name, request)
+            except (RuntimeError, KeyError, ValueError) as e:
                 click.echo(f"Error: {e}", err=True)
                 raise SystemExit(1) from None
 
-            is_error = bool(result.get("isError"))
+            is_error = result.isError or False
 
             # Check for auto-dump if no explicit output and no error
             auto_dump_path, dump_threshold = None, None
@@ -102,11 +116,12 @@ class DynamicServerGroup(click.Group):
             # Handle error for non-file output
             if is_error:
                 if json_output:
-                    click.echo(json.dumps(result, indent=2))
+                    result_dict = result.model_dump(mode="json", exclude_none=True)
+                    click.echo(json.dumps(result_dict, indent=2))
                 else:
-                    for item in result.get("content", []):
-                        if item.get("type") == "text":
-                            click.echo(f"Error: {item.get('text')}", err=True)
+                    for item in result.content:
+                        if hasattr(item, "text"):
+                            click.echo(f"Error: {item.text}", err=True)
                 raise SystemExit(1)
 
             self._print_result(result, json_output=json_output)
@@ -118,9 +133,17 @@ class DynamicServerGroup(click.Group):
             callback=tool_callback,
         )
 
-    def _build_params_from_schema(self, schema: dict[str, Any]) -> list[click.Parameter]:
-        """Build Click parameters from JSON schema."""
+    def _build_params_from_schema(
+        self, schema: dict[str, Any]
+    ) -> tuple[list[click.Parameter], dict[str, str]]:
+        """Build Click parameters from JSON schema.
+
+        Returns:
+            Tuple of (parameters, name_mapping) where name_mapping maps
+            Click's lowercased param names back to original MCP property names.
+        """
         params: list[click.Parameter] = []
+        name_mapping: dict[str, str] = {}  # click_name -> mcp_name
         properties = schema.get("properties", {})
         required = schema.get("required", [])
 
@@ -145,6 +168,10 @@ class DynamicServerGroup(click.Group):
             if "enum" in prop_schema:
                 click_type = click.Choice(prop_schema["enum"])
 
+            # Click lowercases option names, track the mapping
+            click_param_name = prop_name.lower().replace("-", "_")
+            name_mapping[click_param_name] = prop_name
+
             params.append(
                 click.Option(
                     [f"--{prop_name.replace('_', '-')}"],
@@ -155,18 +182,18 @@ class DynamicServerGroup(click.Group):
                 )
             )
 
-        return params
+        return params, name_mapping
 
-    def _estimate_tokens(self, result: dict[str, Any]) -> int:
+    def _estimate_tokens(self, result: CallToolResult) -> int:
         """Estimate token count from result content."""
         total_chars = 0
-        for item in result.get("content", []):
-            if item.get("type") == "text":
-                total_chars += len(item.get("text", ""))
+        for item in result.content:
+            if hasattr(item, "text"):
+                total_chars += len(item.text)
         return total_chars // 4  # Rough estimate: ~4 chars per token
 
     def _get_auto_dump_path(
-        self, server_name: str, tool_name: str, result: dict[str, Any]
+        self, server_name: str, tool_name: str, result: CallToolResult
     ) -> tuple[str | None, int | None]:
         """Check if result should be auto-dumped based on settings.
 
@@ -193,7 +220,7 @@ class DynamicServerGroup(click.Group):
 
     def _write_result_to_file(
         self,
-        result: dict[str, Any],
+        result: CallToolResult,
         output_path: str,
         is_error: bool,
         auto_dump_path: str | None,
@@ -208,17 +235,18 @@ class DynamicServerGroup(click.Group):
         settings = load_settings()
         dump_call_args = settings.get_dump_call_args(server_name)
 
+        result_dict = result.model_dump(mode="json", exclude_none=True)
         if dump_call_args:
-            output_data = {
+            output_data: Any = {
                 "tool_call": {
                     "server": server_name,
                     "tool": tool_name,
                     "arguments": arguments,
                 },
-                "response": result,
+                "response": result_dict,
             }
         else:
-            output_data = result
+            output_data = result_dict
 
         with open(output_path, "w") as f:
             json.dump(output_data, f, indent=2)
@@ -227,21 +255,24 @@ class DynamicServerGroup(click.Group):
             raise SystemExit(1)
         click.echo("Tool executed successfully.")
         if auto_dump_path:
-            click.echo(f"Response exceeded {dump_threshold} tokens, auto-dumped to: {output_path}")
+            click.echo(
+                f"Response exceeded {dump_threshold} tokens, auto-dumped to: {output_path}"
+            )
         else:
             click.echo(f"Tool output written to: {output_path}")
 
-    def _print_result(self, result: dict[str, Any], json_output: bool = False) -> None:
+    def _print_result(self, result: CallToolResult, json_output: bool = False) -> None:
         """Print tool result to console."""
         if json_output:
-            click.echo(json.dumps(result, indent=2))
+            result_dict = result.model_dump(mode="json", exclude_none=True)
+            click.echo(json.dumps(result_dict, indent=2))
             return
 
-        for item in result.get("content", []):
-            if item.get("type") == "text":
-                click.echo(item.get("text"))
-            elif item.get("type") == "image":
-                click.echo(f"[Image: {item.get('mimeType', 'unknown')}]")
+        for item in result.content:
+            if hasattr(item, "text"):
+                click.echo(item.text)
+            elif hasattr(item, "mimeType"):
+                click.echo(f"[Image: {item.mimeType}]")
             else:
                 click.echo(str(item))
 

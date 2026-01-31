@@ -69,6 +69,31 @@ class ToolRunner:
         msg = f"Tool '{tool_name}' not found on server '{server}'"
         raise KeyError(msg)
 
+    def _validate_arguments(
+        self, tool: Tool, arguments: dict[str, object] | None
+    ) -> None:
+        """Validate tool arguments against the tool's input schema.
+
+        Args:
+            tool: Tool definition with inputSchema.
+            arguments: Arguments to validate.
+
+        Raises:
+            ValueError: If required arguments are missing.
+        """
+        schema = tool.inputSchema or {}
+        required = schema.get("required", [])
+
+        if not required:
+            return
+
+        provided = set(arguments.keys()) if arguments else set()
+        missing = [arg for arg in required if arg not in provided]
+
+        if missing:
+            missing_str = ", ".join(f"--{arg}" for arg in missing)
+            raise ValueError(f"Missing required argument(s): {missing_str}")
+
     def call(
         self,
         server: str,
@@ -91,8 +116,9 @@ class ToolRunner:
             RuntimeError: If server not initialized or tool call fails.
             KeyError: If server or tool not found.
         """
-        # Verify tool exists
-        self.get_tool(server, request.name)
+        # Verify tool exists and validate arguments
+        tool = self.get_tool(server, request.name)
+        self._validate_arguments(tool, request.arguments)
 
         # Check if server has active socket (persistent mode)
         socket_path = self.server_manager.get_socket_path(server)
