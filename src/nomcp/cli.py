@@ -1,6 +1,8 @@
 """CLI entry point for noMCP."""
 
 import json
+from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import click
@@ -33,8 +35,15 @@ class DynamicServerGroup(click.Group):
         """Create a dynamic command group for a server."""
 
         @click.group(name=server_name, help=f"Tools for {server_name} server")
-        def server_group() -> None:
-            pass
+        @click.option("--json", "json_output", is_flag=True, help="Output raw JSON response.")
+        @click.option("--output", "output_path", type=click.Path(), help="Write JSON result to file.")
+        @click.pass_context
+        def server_group(ctx: click.Context, json_output: bool, output_path: str | None) -> None:
+            if json_output and output_path:
+                raise click.UsageError("--json and --output are mutually exclusive.")
+            ctx.ensure_object(dict)
+            ctx.obj["json_output"] = json_output
+            ctx.obj["output_path"] = output_path
 
         # Add each tool as a subcommand
         for tool in cache.tools:
@@ -52,16 +61,55 @@ class DynamicServerGroup(click.Group):
 
         @click.pass_context
         def tool_callback(ctx: click.Context, **kwargs: Any) -> None:
+            json_output = ctx.obj.get("json_output", False)
+            output_path = ctx.obj.get("output_path")
             # Filter out None values
             arguments = {k: v for k, v in kwargs.items() if v is not None}
 
             runner = ToolRunner()
             try:
                 result = runner.call(server_name, tool.name, arguments or None)
-                self._print_result(result)
             except (RuntimeError, KeyError) as e:
                 click.echo(f"Error: {e}", err=True)
                 raise SystemExit(1) from None
+
+            is_error = bool(result.get("isError"))
+
+            # Check for auto-dump if no explicit output and no error
+            auto_dump_path, dump_threshold = None, None
+            if not output_path and not is_error:
+                auto_dump_path, dump_threshold = self._get_auto_dump_path(
+                    server_name, tool.name, result
+                )
+
+            # Use auto_dump_path if triggered, otherwise use explicit output_path
+            effective_output_path = output_path or auto_dump_path
+
+            # Handle file output (explicit or auto-dump)
+            if effective_output_path:
+                self._write_result_to_file(
+                    result,
+                    effective_output_path,
+                    is_error,
+                    auto_dump_path,
+                    dump_threshold,
+                    server_name,
+                    tool.name,
+                    arguments,
+                )
+                return
+
+            # Handle error for non-file output
+            if is_error:
+                if json_output:
+                    click.echo(json.dumps(result, indent=2))
+                else:
+                    for item in result.get("content", []):
+                        if item.get("type") == "text":
+                            click.echo(f"Error: {item.get('text')}", err=True)
+                raise SystemExit(1)
+
+            self._print_result(result, json_output=json_output)
 
         return click.Command(
             name=tool.name,
@@ -109,18 +157,93 @@ class DynamicServerGroup(click.Group):
 
         return params
 
-    def _print_result(self, result: Any) -> None:
-        """Print tool result to console."""
-        if isinstance(result, list):
-            for item in result:
-                if hasattr(item, "text"):
-                    click.echo(item.text)
-                elif hasattr(item, "data"):
-                    click.echo(f"[Binary data: {len(item.data)} bytes]")
-                else:
-                    click.echo(str(item))
+    def _estimate_tokens(self, result: dict[str, Any]) -> int:
+        """Estimate token count from result content."""
+        total_chars = 0
+        for item in result.get("content", []):
+            if item.get("type") == "text":
+                total_chars += len(item.get("text", ""))
+        return total_chars // 4  # Rough estimate: ~4 chars per token
+
+    def _get_auto_dump_path(
+        self, server_name: str, tool_name: str, result: dict[str, Any]
+    ) -> tuple[str | None, int | None]:
+        """Check if result should be auto-dumped based on settings.
+
+        Returns:
+            Tuple of (dump_path, threshold) if auto-dump triggered, (None, None) otherwise.
+        """
+        from nomcp.config import load_settings
+
+        settings = load_settings()
+        dump_threshold = settings.get_dump_threshold(server_name)
+
+        if not dump_threshold:
+            return None, None
+
+        estimated_tokens = self._estimate_tokens(result)
+        if estimated_tokens <= dump_threshold:
+            return None, None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{server_name}_{tool_name}_{timestamp}.json"
+        dump_dir = Path(settings.dump_dir)
+        dump_dir.mkdir(parents=True, exist_ok=True)
+        return str(dump_dir / filename), dump_threshold
+
+    def _write_result_to_file(
+        self,
+        result: dict[str, Any],
+        output_path: str,
+        is_error: bool,
+        auto_dump_path: str | None,
+        dump_threshold: int | None,
+        server_name: str,
+        tool_name: str,
+        arguments: dict[str, Any],
+    ) -> None:
+        """Write result to file and print status message."""
+        from nomcp.config import load_settings
+
+        settings = load_settings()
+        dump_call_args = settings.get_dump_call_args(server_name)
+
+        if dump_call_args:
+            output_data = {
+                "tool_call": {
+                    "server": server_name,
+                    "tool": tool_name,
+                    "arguments": arguments,
+                },
+                "response": result,
+            }
         else:
-            click.echo(json.dumps(result, indent=2) if isinstance(result, dict) else str(result))
+            output_data = result
+
+        with open(output_path, "w") as f:
+            json.dump(output_data, f, indent=2)
+        if is_error:
+            click.echo(f"Failed: {output_path}", err=True)
+            raise SystemExit(1)
+        click.echo("Tool executed successfully.")
+        if auto_dump_path:
+            click.echo(f"Response exceeded {dump_threshold} tokens, auto-dumped to: {output_path}")
+        else:
+            click.echo(f"Tool output written to: {output_path}")
+
+    def _print_result(self, result: dict[str, Any], json_output: bool = False) -> None:
+        """Print tool result to console."""
+        if json_output:
+            click.echo(json.dumps(result, indent=2))
+            return
+
+        for item in result.get("content", []):
+            if item.get("type") == "text":
+                click.echo(item.get("text"))
+            elif item.get("type") == "image":
+                click.echo(f"[Image: {item.get('mimeType', 'unknown')}]")
+            else:
+                click.echo(str(item))
 
     def list_commands(self, ctx: click.Context) -> list[str]:
         """List all commands including dynamic server commands."""
