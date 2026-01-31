@@ -3,13 +3,13 @@
 import json
 from pathlib import Path
 
-from nomcp.models import NoMCPConfig, NoMCPSettings
+from mcp2cli.models import Mcp2CliConfig, Mcp2CliSettings
 
 # Base directory
-NOMCP_DIR = Path(".nomcp")
+MCP2CLI_DIR = Path(".mcp2cli")
 
-# File and directory names within .nomcp/
-MCP_CONFIG_PATH = NOMCP_DIR / ".mcp.json"
+# File and directory names within .mcp2cli/
+MCP_CONFIG_PATH = MCP2CLI_DIR / ".mcp.json"
 SETTINGS_FILE = ".settings.json"
 SERVERS_DIR = "servers"
 
@@ -20,8 +20,8 @@ SOCKETS_DIR = ".tmp/sockets"
 LOGS_DIR = ".tmp/logs"
 
 DEFAULT_SETTINGS_PATHS = [
-    NOMCP_DIR / SETTINGS_FILE,
-    Path.home() / ".nomcp" / SETTINGS_FILE,
+    MCP2CLI_DIR / SETTINGS_FILE,
+    Path.home() / ".mcp2cli" / SETTINGS_FILE,
 ]
 
 
@@ -40,7 +40,7 @@ def find_settings_file() -> Path | None:
     return None
 
 
-def load_mcp_config(path: Path | None = None) -> NoMCPConfig:
+def load_mcp_config(path: Path | None = None) -> Mcp2CliConfig:
     """Load MCP configuration from file.
 
     Args:
@@ -62,11 +62,11 @@ def load_mcp_config(path: Path | None = None) -> NoMCPConfig:
     with path.open() as f:
         data = json.load(f)
 
-    return NoMCPConfig.model_validate(data)
+    return Mcp2CliConfig.model_validate(data)
 
 
-def load_settings(path: Path | None = None) -> NoMCPSettings:
-    """Load noMCP settings from file.
+def load_settings(path: Path | None = None) -> Mcp2CliSettings:
+    """Load mcp2cli settings from file.
 
     Args:
         path: Path to settings file. If None, searches default locations.
@@ -78,23 +78,23 @@ def load_settings(path: Path | None = None) -> NoMCPSettings:
         path = find_settings_file()
 
     if path is None or not path.exists():
-        return NoMCPSettings()
+        return Mcp2CliSettings()
 
     with path.open() as f:
         data = json.load(f)
 
-    return NoMCPSettings.model_validate(data)
+    return Mcp2CliSettings.model_validate(data)
 
 
-def get_nomcp_dir() -> Path:
-    """Get the .nomcp directory, creating it if needed."""
-    NOMCP_DIR.mkdir(exist_ok=True)
-    return NOMCP_DIR
+def get_mcp2cli_dir() -> Path:
+    """Get the .mcp2cli directory, creating it if needed."""
+    MCP2CLI_DIR.mkdir(exist_ok=True)
+    return MCP2CLI_DIR
 
 
 def get_sockets_dir() -> Path:
     """Get the sockets directory, creating it if needed."""
-    sockets_dir = get_nomcp_dir() / SOCKETS_DIR
+    sockets_dir = get_mcp2cli_dir() / SOCKETS_DIR
     sockets_dir.mkdir(parents=True, exist_ok=True)
     return sockets_dir
 
@@ -106,7 +106,7 @@ def get_socket_path(server_name: str) -> Path:
 
 def get_servers_dir() -> Path:
     """Get the servers cache directory, creating it if needed."""
-    servers_dir = get_nomcp_dir() / SERVERS_DIR
+    servers_dir = get_mcp2cli_dir() / SERVERS_DIR
     servers_dir.mkdir(exist_ok=True)
     return servers_dir
 

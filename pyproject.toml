@@ -1,5 +1,5 @@
 [project]
-name = "nomcp"
+name = "mcp2cli"
 version = "0.1.0"
 description = "CLI interface for MCP servers - interact with MCP tools directly from the terminal"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 
 # CLI entry point
 [project.scripts]
-nomcp = "nomcp.cli:main"
+mcp2cli = "mcp2cli.cli:main"
 
 # Build system - required for entry points to work
 [build-system]

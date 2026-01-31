@@ -10,16 +10,16 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from nomcp.config import (
+from mcp2cli.config import (
     LOGS_DIR,
     find_mcp_config_file,
-    get_nomcp_dir,
+    get_mcp2cli_dir,
     get_socket_path,
     load_mcp_config,
 )
-from nomcp.core import MCPClient, ProcessManager
-from nomcp.models import MCPServerConfig, ProcessInfo, ToolsCache
-from nomcp.utils import get_package_version, load_tools_cache, save_tools_cache
+from mcp2cli.core import MCPClient, ProcessManager
+from mcp2cli.models import MCPServerConfig, ProcessInfo, ToolsCache
+from mcp2cli.utils import get_package_version, load_tools_cache, save_tools_cache
 
 
 class InitResult(BaseModel):
@@ -174,13 +174,13 @@ class ServerManager:
         process_env = os.environ.copy()
         if server_config.env:
             # Pass server env to daemon via special env var
-            process_env["NOMCP_DAEMON_ENV"] = json.dumps(server_config.env)
+            process_env["MCP2CLI_DAEMON_ENV"] = json.dumps(server_config.env)
 
         # Socket path for this daemon
         socket_path = get_socket_path(name)
 
         # Log file for daemon stderr
-        log_dir = get_nomcp_dir() / LOGS_DIR
+        log_dir = get_mcp2cli_dir() / LOGS_DIR
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"{name}.log"
 

@@ -16,7 +16,7 @@ class MCPServerConfig(BaseModel):
     """Environment variables for the server."""
 
 
-class NoMCPConfig(BaseModel):
+class Mcp2CliConfig(BaseModel):
     """Root configuration model."""
 
     mcp_servers: dict[str, MCPServerConfig] = Field(
@@ -35,12 +35,12 @@ class ServerSettings(BaseModel):
     """Whether to include call args in dumps. None means use global setting."""
 
 
-class NoMCPSettings(BaseModel):
-    """noMCP-specific settings."""
+class Mcp2CliSettings(BaseModel):
+    """mcp2cli-specific settings."""
 
     model_config = ConfigDict(validate_default=True)
 
-    dump_dir: str = "nomcp_output"
+    dump_dir: str = "mcp2cli_output"
     """Directory for auto-dumped output files."""
 
     dump_threshold: int | None = None

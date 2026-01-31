@@ -1,4 +1,4 @@
-"""CLI entry point for noMCP."""
+"""CLI entry point for mcp2cli."""
 
 import json
 from datetime import datetime
@@ -8,7 +8,7 @@ from typing import Any
 import click
 from mcp.types import CallToolRequestParams, CallToolResult
 
-from nomcp import __version__
+from mcp2cli import __version__
 
 
 class DynamicServerGroup(click.Group):
@@ -21,7 +21,7 @@ class DynamicServerGroup(click.Group):
             return cmd
 
         # Check if it's a server name
-        from nomcp.utils import load_tools_cache
+        from mcp2cli.utils import load_tools_cache
 
         cache = load_tools_cache(cmd_name)
         if cache is None:
@@ -76,7 +76,7 @@ class DynamicServerGroup(click.Group):
 
     def _create_tool_command(self, server_name: str, tool: Any) -> click.Command:
         """Create a Click command for a tool."""
-        from nomcp.services import ToolRunner
+        from mcp2cli.services import ToolRunner
 
         # Build parameters from input schema
         params, name_mapping = self._build_params_from_schema(tool.inputSchema)
@@ -216,7 +216,7 @@ class DynamicServerGroup(click.Group):
         Returns:
             Tuple of (dump_path, threshold) if auto-dump triggered, (None, None) otherwise.
         """
-        from nomcp.config import load_settings
+        from mcp2cli.config import load_settings
 
         settings = load_settings()
         dump_threshold = settings.get_dump_threshold(server_name)
@@ -264,7 +264,7 @@ class DynamicServerGroup(click.Group):
         arguments: dict[str, Any],
     ) -> None:
         """Write result to file and print status message."""
-        from nomcp.config import load_settings
+        from mcp2cli.config import load_settings
 
         settings = load_settings()
         dump_call_args = settings.get_dump_call_args(server_name)
@@ -315,9 +315,9 @@ class DynamicServerGroup(click.Group):
         commands = list(super().list_commands(ctx))
 
         # Add initialized servers
-        from nomcp.config import get_nomcp_dir
+        from mcp2cli.config import get_mcp2cli_dir
 
-        servers_dir = get_nomcp_dir() / "servers"
+        servers_dir = get_mcp2cli_dir() / "servers"
         if servers_dir.exists():
             for path in servers_dir.glob("*.json"):
                 server_name = path.stem
@@ -328,9 +328,9 @@ class DynamicServerGroup(click.Group):
 
     def _get_server_names(self) -> list[str]:
         """Get list of initialized server names."""
-        from nomcp.config import get_nomcp_dir
+        from mcp2cli.config import get_mcp2cli_dir
 
-        servers_dir = get_nomcp_dir() / "servers"
+        servers_dir = get_mcp2cli_dir() / "servers"
         if not servers_dir.exists():
             return []
         return [p.stem for p in servers_dir.glob("*.json")]
@@ -373,13 +373,13 @@ class DynamicServerGroup(click.Group):
 @click.group(
     cls=DynamicServerGroup,
     epilog="""\
-Use 'nomcp clt --help' for server management.
+Use 'mcp2cli clt --help' for server management.
 
-Use 'nomcp <server> --help' for server tools.""",
+Use 'mcp2cli <server> --help' for server tools.""",
 )
-@click.version_option(version=__version__, prog_name="nomcp")
+@click.version_option(version=__version__, prog_name="mcp2cli")
 def main() -> None:
-    """noMCP - CLI interface for MCP servers."""
+    """mcp2cli - CLI interface for MCP servers."""
 
 
 # =============================================================================
@@ -400,7 +400,7 @@ def init(server: str, force: bool) -> None:
 
     SERVER is the name of the server defined in the config file.
     """
-    from nomcp.services import ServerManager
+    from mcp2cli.services import ServerManager
 
     manager = ServerManager()
 
@@ -431,7 +431,7 @@ def start(server: str) -> None:
 
     SERVER is the name of the server defined in the config file.
     """
-    from nomcp.services import ServerManager
+    from mcp2cli.services import ServerManager
 
     manager = ServerManager()
 
@@ -440,7 +440,7 @@ def start(server: str) -> None:
         raise SystemExit(1)
 
     if not manager.is_initialized(server):
-        click.echo(f"Error: Server '{server}' not initialized. Run: nomcp clt init {server}", err=True)
+        click.echo(f"Error: Server '{server}' not initialized. Run: mcp2cli clt init {server}", err=True)
         raise SystemExit(1)
 
     try:
@@ -461,7 +461,7 @@ def stop(server: str) -> None:
 
     SERVER is the name of the server to stop.
     """
-    from nomcp.services import ServerManager
+    from mcp2cli.services import ServerManager
 
     manager = ServerManager()
 
@@ -474,7 +474,7 @@ def stop(server: str) -> None:
 @clt.command(name="list")
 def list_servers() -> None:
     """List configured MCP servers."""
-    from nomcp.services import ServerManager
+    from mcp2cli.services import ServerManager
 
     manager = ServerManager()
 

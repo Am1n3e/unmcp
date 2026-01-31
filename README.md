@@ -1,4 +1,4 @@
-# noMCP
+# mcp2cli
 
 **Skip MCP. Enjoy CLI.**
 
@@ -7,23 +7,23 @@ Use MCP server tools directly from your terminal. Perfect for scripting, automat
 ## Quick Start
 
 ```bash
-# 1. Configure your MCP servers in .nomcp/.mcp.json
+# 1. Configure your MCP servers in .mcp2cli/.mcp.json
 # 2. Initialize a server (discovers available tools)
-uvx nomcp clt init <server>
+uvx mcp2cli clt init <server>
 
 # 3. Call tools directly
-uvx nomcp <server> <tool> [OPTIONS]
+uvx mcp2cli <server> <tool> [OPTIONS]
 ```
 
-## Why noMCP?
+## Why mcp2cli?
 
 MCP servers offer powerful, structured tools. But the MCP protocol loads large tool schemas and verbose data into AI context—expensive in tokens, slow in practice.
 
 CLI is leaner. It avoids loading tool schemas and verbose outputs into model context.
 
-noMCP gives you direct CLI access to MCP server tools. Same tools, no protocol overhead.
+mcp2cli gives you direct CLI access to MCP server tools. Same tools, no protocol overhead.
 
-Not every MCP server has an official CLI. Rather than waiting, noMCP lets you use existing MCP servers as CLIs right now.
+Not every MCP server has an official CLI. Rather than waiting, mcp2cli lets you use existing MCP servers as CLIs right now.
 
 See [Playwright CLI vs MCP](https://github.com/microsoft/playwright-mcp#cli-mode-vs-mcp-mode) for a similar motivation.
 
@@ -32,10 +32,10 @@ See [Playwright CLI vs MCP](https://github.com/microsoft/playwright-mcp#cli-mode
 ### Server Management
 
 ```bash
-uvx nomcp clt init <server>      # Initialize and discover tools (--force to reinitialize)
-uvx nomcp clt list               # List servers with status
-uvx nomcp clt start <server>     # Start persistent daemon
-uvx nomcp clt stop <server>      # Stop daemon
+uvx mcp2cli clt init <server>      # Initialize and discover tools (--force to reinitialize)
+uvx mcp2cli clt list               # List servers with status
+uvx mcp2cli clt start <server>     # Start persistent daemon
+uvx mcp2cli clt stop <server>      # Stop daemon
 ```
 
 ### Calling Tools
@@ -44,22 +44,22 @@ Argument names match the MCP tool schema exactly (e.g., `libraryId` becomes `--l
 
 ```bash
 # Basic call
-uvx nomcp <server> <tool> --arg1 "value"
+uvx mcp2cli <server> <tool> --arg1 "value"
 
 # Output as JSON (flag before tool name)
-uvx nomcp <server> --json <tool> --arg1 "value"
+uvx mcp2cli <server> --json <tool> --arg1 "value"
 
 # Save to file (flag before tool name)
-uvx nomcp <server> --output result.json <tool> --arg1 "value"
+uvx mcp2cli <server> --output result.json <tool> --arg1 "value"
 
 # Save to directory (auto-generates filename: {server}_{tool}_{timestamp}.json)
-uvx nomcp <server> --output ./output_dir/ <tool> --arg1 "value"
+uvx mcp2cli <server> --output ./output_dir/ <tool> --arg1 "value"
 
 # View available tools
-uvx nomcp <server> --help
+uvx mcp2cli <server> --help
 
 # View tool options
-uvx nomcp <server> <tool> --help
+uvx mcp2cli <server> <tool> --help
 ```
 
 ## Execution Modes
@@ -72,7 +72,7 @@ Each tool call spawns a new MCP server, executes the tool, and exits.
 
 ```mermaid
 sequenceDiagram
-    participant CLI as uvx nomcp
+    participant CLI as uvx mcp2cli
     participant MCP as MCP Server
 
     CLI->>MCP: spawn process
@@ -89,30 +89,30 @@ A daemon process keeps the MCP server running. Tool calls connect via Unix socke
 
 ```mermaid
 sequenceDiagram
-    participant CLI as uvx nomcp
+    participant CLI as uvx mcp2cli
     participant D as Daemon
     participant MCP as MCP Server
 
-    Note over CLI,MCP: uvx nomcp clt start
+    Note over CLI,MCP: uvx mcp2cli clt start
     D->>MCP: spawn & initialize
     D->>D: listen on socket
 
-    Note over CLI,MCP: uvx nomcp <server> <tool>
+    Note over CLI,MCP: uvx mcp2cli <server> <tool>
     CLI->>D: call via socket
     D->>MCP: call_tool()
     MCP-->>D: result
     D-->>CLI: result
 
-    Note over CLI,MCP: uvx nomcp clt stop
+    Note over CLI,MCP: uvx mcp2cli clt stop
     CLI->>D: shutdown
     D->>MCP: close
 ```
 
 ## Configuration
 
-### MCP Servers Config (`.nomcp/.mcp.json`)
+### MCP Servers Config (`.mcp2cli/.mcp.json`)
 
-Follows the standard MCP config format. Add as many servers as needed (local or global at `~/.nomcp/.mcp.json`):
+Follows the standard MCP config format. Add as many servers as needed (local or global at `~/.mcp2cli/.mcp.json`):
 
 ```json
 {
@@ -135,11 +135,11 @@ Follows the standard MCP config format. Add as many servers as needed (local or 
 
 Automatically save large outputs to files, keeping Agent context (and your terminal) clean.
 
-Configure in `.nomcp/.settings.json`:
+Configure in `.mcp2cli/.settings.json`:
 
 ```json
 {
-  "dump_dir": "nomcp_output",
+  "dump_dir": "mcp2cli_output",
   "servers": {
     "context7": {
       "dump_threshold": 500
@@ -175,7 +175,7 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 ### Setup
 
 ```json
-// .nomcp/.mcp.json
+// .mcp2cli/.mcp.json
 {
   "mcpServers": {
     "context7": {
@@ -189,7 +189,7 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 ### Auto-Dump Setup
 
 ```json
-// .nomcp/.settings.json
+// .mcp2cli/.settings.json
 {
   "dump_dir": "docs_output",
   "dump_threshold": 0,
@@ -205,10 +205,10 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 
 ```bash
 # Initialize
-uvx nomcp clt init context7
+uvx mcp2cli clt init context7
 
 # Query docs - automatically saved to docs_output/
-uvx nomcp context7 query-docs --libraryId "/vercel/next.js" --query "app router"
+uvx mcp2cli context7 query-docs --libraryId "/vercel/next.js" --query "app router"
 ```
 
 With `dump_threshold: 0`, every Context7 response saves to `docs_output/`, keeping your AI context lean while preserving full documentation access.

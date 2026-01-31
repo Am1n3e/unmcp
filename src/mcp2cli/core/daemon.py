@@ -17,7 +17,7 @@ from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.types import CallToolRequestParams
 
-from nomcp.config import get_socket_path
+from mcp2cli.config import get_socket_path
 
 
 class DaemonServer:
@@ -268,7 +268,7 @@ def main() -> None:
     args = sys.argv[3:]
 
     # Get env from environment variable if set
-    env_json = os.environ.get("NOMCP_DAEMON_ENV")
+    env_json = os.environ.get("MCP2CLI_DAEMON_ENV")
     env = json.loads(env_json) if env_json else None
 
     asyncio.run(run_daemon(server_name, command, args, env))

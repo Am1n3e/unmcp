@@ -7,9 +7,9 @@ from pathlib import Path
 
 from mcp.types import CallToolRequestParams, CallToolResult, TextContent, Tool
 
-from nomcp.core import MCPClient
-from nomcp.services.server_manager import ServerManager
-from nomcp.utils import load_tools_cache
+from mcp2cli.core import MCPClient
+from mcp2cli.services.server_manager import ServerManager
+from mcp2cli.utils import load_tools_cache
 
 
 class ToolRunner:
@@ -44,7 +44,7 @@ class ToolRunner:
         """
         cache = load_tools_cache(server)
         if cache is None:
-            msg = f"Server '{server}' not initialized. Run: nomcp clt init {server}"
+            msg = f"Server '{server}' not initialized. Run: mcp2cli clt init {server}"
             raise RuntimeError(msg)
         return cache.tools
 
