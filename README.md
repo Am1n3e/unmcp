@@ -4,6 +4,8 @@
 
 Use MCP server tools directly from your terminal. Perfect for scripting, automation, and agentic workflows.
 
+**Compatibility:** Expected to work with most MCP servers out of the box—just point it at any stdio-based MCP server and go.
+
 ## Quick Start
 
 ```bash
