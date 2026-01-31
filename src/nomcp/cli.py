@@ -261,11 +261,7 @@ def list_servers() -> None:
     # Build table data
     rows = []
     for name, config in servers.items():
-        info = statuses.get(name)
-        if info:
-            status = "persistent" if info.socket_path else "running"
-        else:
-            status = "stopped"
+        status = "running" if statuses.get(name) else "stopped"
         command = f"{config.command} {' '.join(config.args)}"
         rows.append((name, status, command))
 
