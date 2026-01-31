@@ -138,8 +138,57 @@ class DynamicServerGroup(click.Group):
 
         return sorted(commands)
 
+    def _get_server_names(self) -> list[str]:
+        """Get list of initialized server names."""
+        from nomcp.config import get_nomcp_dir
 
-@click.group(cls=DynamicServerGroup)
+        servers_dir = get_nomcp_dir() / "servers"
+        if not servers_dir.exists():
+            return []
+        return [p.stem for p in servers_dir.glob("*.json")]
+
+    def format_commands(
+        self, ctx: click.Context, formatter: click.HelpFormatter
+    ) -> None:
+        """Format commands into separate sections."""
+        commands = []
+        for subcommand in self.list_commands(ctx):
+            cmd = self.get_command(ctx, subcommand)
+            if cmd is None or cmd.hidden:
+                continue
+            commands.append((subcommand, cmd))
+
+        if not commands:
+            return
+
+        server_names = set(self._get_server_names())
+        builtin_cmds = [(name, cmd) for name, cmd in commands if name not in server_names]
+        server_cmds = [(name, cmd) for name, cmd in commands if name in server_names]
+
+        # Built-in commands
+        if builtin_cmds:
+            with formatter.section("Commands"):
+                formatter.write_dl([
+                    (name, cmd.get_short_help_str(limit=formatter.width))
+                    for name, cmd in builtin_cmds
+                ])
+
+        # Server commands
+        if server_cmds:
+            with formatter.section("Servers"):
+                formatter.write_dl([
+                    (name, cmd.get_short_help_str(limit=formatter.width))
+                    for name, cmd in server_cmds
+                ])
+
+
+@click.group(
+    cls=DynamicServerGroup,
+    epilog="""\
+Use 'nomcp clt --help' for server management.
+
+Use 'nomcp <server> --help' for server tools.""",
+)
 @click.version_option(version=__version__, prog_name="nomcp")
 def main() -> None:
     """noMCP - CLI interface for MCP servers."""
