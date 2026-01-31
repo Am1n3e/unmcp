@@ -155,17 +155,27 @@ class ServerManager:
             # Pass server env to daemon via special env var
             process_env["NOMCP_DAEMON_ENV"] = json.dumps(server_config.env)
 
-        # Start daemon process in background
-        process = subprocess.Popen(  # noqa: S603
-            daemon_cmd,
-            env=process_env,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            start_new_session=True,
-        )
+        # Socket path for this daemon
+        socket_path = get_socket_path(name)
+
+        # Log file for daemon stderr
+        from nomcp.config import get_nomcp_dir
+        log_dir = get_nomcp_dir() / "logs"
+        log_dir.mkdir(exist_ok=True)
+        log_file = log_dir / f"{name}.log"
+
+        # Start daemon process in background (fully detached)
+        with log_file.open("w") as stderr_file:
+            process = subprocess.Popen(  # noqa: S603
+                daemon_cmd,
+                env=process_env,
+                stdout=subprocess.DEVNULL,
+                stderr=stderr_file,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
 
         # Record process info with socket path
-        socket_path = get_socket_path(name)
         info = ProcessInfo(
             name=name,
             pid=process.pid,
@@ -179,20 +189,26 @@ class ServerManager:
         registry.processes[name] = info
         self._process_manager._save_registry(registry)
 
-        # Wait a bit for daemon to start and check if it's still running
+        # Wait for socket to appear (daemon ready)
         import time
-        time.sleep(0.5)
+        for _ in range(20):  # Wait up to 10 seconds
+            time.sleep(0.5)
+            if socket_path.exists():
+                return info
+            if not self._process_manager.is_alive(process.pid):
+                break
 
-        if not self._process_manager.is_alive(process.pid):
-            # Daemon failed to start, read stderr
-            stderr = process.stderr.read().decode() if process.stderr else ""
-            # Clean up registry
-            del registry.processes[name]
-            self._process_manager._save_registry(registry)
-            msg = f"Daemon failed to start: {stderr}"
-            raise RuntimeError(msg)
+        # Daemon failed to start
+        del registry.processes[name]
+        self._process_manager._save_registry(registry)
 
-        return info
+        # Read error from log file
+        error_msg = ""
+        if log_file.exists():
+            error_msg = log_file.read_text().strip()
+
+        msg = f"Daemon failed to start: {error_msg}" if error_msg else "Daemon failed to start"
+        raise RuntimeError(msg)
 
     def stop(self, name: str) -> bool:
         """Stop a running server.
