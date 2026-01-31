@@ -268,7 +268,7 @@ wheels = [
 ]
 
 [[package]]
-name = "nomcp"
+name = "mcp2cli"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
