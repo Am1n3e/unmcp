@@ -30,6 +30,14 @@ class DynamicServerGroup(click.Group):
         # Create dynamic group for this server
         return self._create_server_group(cmd_name, cache)
 
+    def _has_nested_args(self, schema: dict[str, Any]) -> bool:
+        """Check if schema has object or array type properties."""
+        properties = schema.get("properties", {})
+        for prop_schema in properties.values():
+            if prop_schema.get("type") in ("array", "object"):
+                return True
+        return False
+
     def _create_server_group(
         self, server_name: str, cache: Any
     ) -> click.Group:
@@ -46,8 +54,10 @@ class DynamicServerGroup(click.Group):
             ctx.obj["json_output"] = json_output
             ctx.obj["output_path"] = output_path
 
-        # Add each tool as a subcommand
+        # Add each tool as a subcommand (skip tools with nested args)
         for tool in cache.tools:
+            if self._has_nested_args(tool.inputSchema):
+                continue  # Skip tools with nested args
             cmd = self._create_tool_command(server_name, tool)
             server_group.add_command(cmd)
 
@@ -76,6 +86,10 @@ class DynamicServerGroup(click.Group):
             json_output = ctx.obj.get("json_output", False)
             output_path = ctx.obj.get("output_path")
             arguments = self._map_arguments(kwargs, name_mapping)
+
+            # Resolve output_path if it's a directory
+            if output_path:
+                output_path = self._resolve_output_path(output_path, server_name, tool.name)
 
             runner = ToolRunner()
             try:
@@ -162,7 +176,9 @@ class DynamicServerGroup(click.Group):
             elif prop_type == "boolean":
                 click_type = bool
             elif prop_type in ("array", "object"):
-                click_type = str  # Accept as JSON string
+                raise NotImplementedError(
+                    f"Nested arguments (type '{prop_type}') are not yet supported"
+                )
 
             # Handle enums
             if "enum" in prop_schema:
@@ -217,6 +233,17 @@ class DynamicServerGroup(click.Group):
         dump_dir = Path(settings.dump_dir)
         dump_dir.mkdir(parents=True, exist_ok=True)
         return str(dump_dir / filename), dump_threshold
+
+    def _resolve_output_path(
+        self, output_path: str, server_name: str, tool_name: str
+    ) -> str:
+        """Resolve output path, generating filename if path is a directory."""
+        path = Path(output_path)
+        if path.is_dir():
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{server_name}_{tool_name}_{timestamp}.json"
+            return str(path / filename)
+        return output_path
 
     def _write_result_to_file(
         self,
