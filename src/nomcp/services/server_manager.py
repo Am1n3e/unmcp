@@ -6,32 +6,51 @@ import json
 import os
 import subprocess
 import sys
-from dataclasses import dataclass, field
 from pathlib import Path
 
-from nomcp.config import find_config_file, load_config
-from nomcp.daemon import get_socket_path
-from nomcp.mcp_client import MCPClient, get_package_version, save_tools_cache
+from pydantic import BaseModel, ConfigDict
+
+from nomcp.config import (
+    LOGS_DIR,
+    find_mcp_config_file,
+    get_nomcp_dir,
+    get_socket_path,
+    load_mcp_config,
+)
+from nomcp.core import MCPClient, ProcessManager
 from nomcp.models import MCPServerConfig, ProcessInfo, ToolsCache
-from nomcp.process_manager import ProcessManager
+from nomcp.utils import get_package_version, load_tools_cache, save_tools_cache
 
 
-@dataclass
-class InitResult:
+class InitResult(BaseModel):
     """Result of server initialization."""
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
     server_name: str
+    """Name of the initialized server."""
+
     version: str | None
+    """Server package version, if determinable."""
+
     tools_count: int
+    """Number of tools discovered."""
+
     tools: ToolsCache
+    """Cached tools information."""
 
 
-@dataclass
 class ServerManager:
     """Manages MCP server lifecycle."""
 
-    config_path: Path | None = None
-    _process_manager: ProcessManager = field(default_factory=ProcessManager)
+    def __init__(self, config_path: Path | None = None) -> None:
+        """Initialize server manager.
+
+        Args:
+            config_path: Path to config file. If None, searches default locations.
+        """
+        self.config_path = config_path
+        self._process_manager = ProcessManager()
 
     def list(self) -> dict[str, MCPServerConfig]:
         """List all configured servers.
@@ -42,7 +61,7 @@ class ServerManager:
         Raises:
             FileNotFoundError: If no config file found.
         """
-        config = load_config(self.config_path)
+        config = load_mcp_config(self.config_path)
         return dict(config.mcp_servers)
 
     def get(self, name: str) -> MCPServerConfig:
@@ -81,7 +100,9 @@ class ServerManager:
             ValueError: If server is already initialized and force is False.
         """
         if not force and self.is_initialized(name):
-            msg = f"Server '{name}' is already initialized. Use --force to reinitialize."
+            msg = (
+                f"Server '{name}' is already initialized. Use --force to reinitialize."
+            )
             raise ValueError(msg)
 
         server_config = self.get(name)
@@ -140,7 +161,7 @@ class ServerManager:
         server_config = self.get(name)
 
         # Prepare daemon command
-        daemon_module = Path(__file__).parent.parent / "daemon.py"
+        daemon_module = Path(__file__).parent.parent / "core" / "daemon.py"
         daemon_cmd = [
             sys.executable,
             str(daemon_module),
@@ -159,9 +180,8 @@ class ServerManager:
         socket_path = get_socket_path(name)
 
         # Log file for daemon stderr
-        from nomcp.config import get_nomcp_dir
-        log_dir = get_nomcp_dir() / "logs"
-        log_dir.mkdir(exist_ok=True)
+        log_dir = get_nomcp_dir() / LOGS_DIR
+        log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"{name}.log"
 
         # Start daemon process in background (fully detached)
@@ -181,16 +201,15 @@ class ServerManager:
             pid=process.pid,
             command=server_config.command,
             args=server_config.args,
-            socket_path=str(socket_path),
+            socket_path=socket_path,
         )
 
-        # Save to registry
-        registry = self._process_manager._load_registry()
-        registry.processes[name] = info
-        self._process_manager._save_registry(registry)
+        # Register in process manager
+        self._process_manager.register(info)
 
         # Wait for socket to appear (daemon ready)
         import time
+
         for _ in range(20):  # Wait up to 10 seconds
             time.sleep(0.5)
             if socket_path.exists():
@@ -198,16 +217,19 @@ class ServerManager:
             if not self._process_manager.is_alive(process.pid):
                 break
 
-        # Daemon failed to start
-        del registry.processes[name]
-        self._process_manager._save_registry(registry)
+        # Daemon failed to start - unregister
+        self._process_manager.unregister(name)
 
         # Read error from log file
         error_msg = ""
         if log_file.exists():
             error_msg = log_file.read_text().strip()
 
-        msg = f"Daemon failed to start: {error_msg}" if error_msg else "Daemon failed to start"
+        msg = (
+            f"Daemon failed to start: {error_msg}"
+            if error_msg
+            else "Daemon failed to start"
+        )
         raise RuntimeError(msg)
 
     def stop(self, name: str) -> bool:
@@ -243,15 +265,12 @@ class ServerManager:
         if info is None or info.socket_path is None:
             return None
 
-        socket_path = Path(info.socket_path)
-        if not socket_path.exists():
+        if not info.socket_path.exists():
             return None
 
-        return socket_path
+        return info.socket_path
 
-    def _send_socket_message(
-        self, socket_path: Path, message: dict
-    ) -> dict:
+    def _send_socket_message(self, socket_path: Path, message: dict) -> dict:
         """Send a message to the daemon via socket.
 
         Args:
@@ -299,10 +318,8 @@ class ServerManager:
         Returns:
             True if initialized.
         """
-        from nomcp.mcp_client import load_tools_cache
-
         return load_tools_cache(name) is not None
 
     def config_exists(self) -> bool:
         """Check if a config file exists."""
-        return find_config_file() is not None
+        return find_mcp_config_file() is not None

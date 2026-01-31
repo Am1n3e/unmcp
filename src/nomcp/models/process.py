@@ -1,6 +1,7 @@
 """Process management models."""
 
 from datetime import datetime
+from pathlib import Path
 
 from pydantic import BaseModel, Field
 
@@ -9,14 +10,19 @@ class ProcessInfo(BaseModel):
     """Information about a running MCP server process."""
 
     name: str
+    """Server name."""
+
     pid: int
+    """Process ID."""
+
     command: str
-    args: list[str] = []
+    """Command used to start the server."""
+
+    args: list[str] = Field(default_factory=list)
+    """Command arguments."""
+
     started_at: datetime = Field(default_factory=datetime.now)
-    socket_path: str | None = None
+    """When the process was started."""
 
-
-class ProcessRegistry(BaseModel):
-    """Registry of all running processes."""
-
-    processes: dict[str, ProcessInfo] = {}
+    socket_path: Path | None = None
+    """Path to Unix socket for persistent mode. None for on-demand processes."""

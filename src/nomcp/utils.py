@@ -1,17 +1,11 @@
-"""MCP client for communicating with MCP servers."""
+"""Utility functions for noMCP."""
 
 import json
 import re
 import shutil
 import subprocess
-from pathlib import Path
-from typing import Any
 
-from mcp import ClientSession
-from mcp.client.stdio import StdioServerParameters, stdio_client
-from mcp.types import Tool
-
-from nomcp.config import get_nomcp_dir
+from nomcp.config import get_tools_cache_path
 from nomcp.models import ToolsCache
 
 
@@ -96,21 +90,9 @@ def get_package_version(command: str, args: list[str]) -> str | None:
     return _extract_version_from_args(args)
 
 
-def _get_servers_dir() -> Path:
-    """Get the servers cache directory, creating it if needed."""
-    servers_dir = get_nomcp_dir() / "servers"
-    servers_dir.mkdir(exist_ok=True)
-    return servers_dir
-
-
-def _get_tools_cache_path(server_name: str) -> Path:
-    """Get path to the tools cache file for a server."""
-    return _get_servers_dir() / f"{server_name}.json"
-
-
 def load_tools_cache(server_name: str) -> ToolsCache | None:
     """Load cached tools for a server."""
-    path = _get_tools_cache_path(server_name)
+    path = get_tools_cache_path(server_name)
     if not path.exists():
         return None
 
@@ -122,77 +104,6 @@ def load_tools_cache(server_name: str) -> ToolsCache | None:
 
 def save_tools_cache(cache: ToolsCache) -> None:
     """Save tools cache to disk."""
-    path = _get_tools_cache_path(cache.server_name)
+    path = get_tools_cache_path(cache.server_name)
     with path.open("w") as f:
         json.dump(cache.model_dump(mode="json"), f, indent=2)
-
-
-class MCPClient:
-    """Client for communicating with MCP servers."""
-
-    def __init__(
-        self,
-        command: str,
-        args: list[str] | None = None,
-        env: dict[str, str] | None = None,
-    ) -> None:
-        """Initialize MCP client.
-
-        Args:
-            command: Command to start the server.
-            args: Command arguments.
-            env: Environment variables.
-        """
-        self.command = command
-        self.args = args or []
-        self.env = env
-
-        self._server_params = StdioServerParameters(
-            command=self.command,
-            args=self.args,
-            env=self.env,
-        )
-
-    async def list_tools(self) -> list[Tool]:
-        """Connect to the server and list available tools.
-
-        Returns:
-            List of tools from the server.
-        """
-        async with (
-            stdio_client(self._server_params) as (read, write),
-            ClientSession(read, write) as session,
-        ):
-            await session.initialize()
-            result = await session.list_tools()
-            return list(result.tools)
-
-    async def call_tool(
-        self,
-        tool_name: str,
-        arguments: dict[str, Any] | None = None,
-    ) -> Any:
-        """Call a tool on the server.
-
-        Args:
-            tool_name: Name of the tool to call.
-            arguments: Arguments to pass to the tool.
-
-        Returns:
-            Tool result content.
-
-        Raises:
-            RuntimeError: If the tool call fails.
-        """
-        async with (
-            stdio_client(self._server_params) as (read, write),
-            ClientSession(read, write) as session,
-        ):
-            await session.initialize()
-            result = await session.call_tool(tool_name, arguments)
-
-            if result.isError:
-                msg = f"Tool '{tool_name}' failed"
-                raise RuntimeError(msg)
-
-            return result.content

@@ -237,9 +237,16 @@ class DynamicServerGroup(click.Group):
     def _resolve_output_path(
         self, output_path: str, server_name: str, tool_name: str
     ) -> str:
-        """Resolve output path, generating filename if path is a directory."""
+        """Resolve output path, generating filename if path is a directory.
+
+        If the path has no extension, it's treated as a directory.
+        Directories are created if they don't exist.
+        """
         path = Path(output_path)
-        if path.is_dir():
+        # Treat as directory if: existing dir, or no file extension
+        is_dir = path.is_dir() or not path.suffix
+        if is_dir:
+            path.mkdir(parents=True, exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"{server_name}_{tool_name}_{timestamp}.json"
             return str(path / filename)
