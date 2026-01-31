@@ -3,21 +3,25 @@
 import asyncio
 import json
 import socket
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
-from mcp.types import TextContent, Tool
+from mcp.types import CallToolRequestParams, CallToolResult, TextContent, Tool
 
-from nomcp.mcp_client import MCPClient, load_tools_cache
+from nomcp.core import MCPClient
 from nomcp.services.server_manager import ServerManager
+from nomcp.utils import load_tools_cache
 
 
-@dataclass
 class ToolRunner:
     """Executes tools on MCP servers."""
 
-    _server_manager: ServerManager | None = None
+    def __init__(self, server_manager: ServerManager | None = None) -> None:
+        """Initialize tool runner.
+
+        Args:
+            server_manager: Server manager to use. If None, creates one.
+        """
+        self._server_manager = server_manager
 
     @property
     def server_manager(self) -> ServerManager:
@@ -68,9 +72,8 @@ class ToolRunner:
     def call(
         self,
         server: str,
-        tool_name: str,
-        arguments: dict[str, Any] | None = None,
-    ) -> Any:
+        request: CallToolRequestParams,
+    ) -> CallToolResult:
         """Call a tool on a server.
 
         If the server is running in persistent mode (has an active socket),
@@ -79,55 +82,52 @@ class ToolRunner:
 
         Args:
             server: Server name.
-            tool_name: Tool name.
-            arguments: Tool arguments.
+            request: Tool call request params with name and arguments.
 
         Returns:
-            Tool result content.
+            Normalized tool result with content and isError fields.
 
         Raises:
             RuntimeError: If server not initialized or tool call fails.
             KeyError: If server or tool not found.
         """
         # Verify tool exists
-        self.get_tool(server, tool_name)
+        self.get_tool(server, request.name)
 
         # Check if server has active socket (persistent mode)
         socket_path = self.server_manager.get_socket_path(server)
         if socket_path:
-            return self._call_via_socket(socket_path, tool_name, arguments)
+            return self._call_via_socket(socket_path, request)
 
         # On-demand mode: spawn new process
-        return self._call_on_demand(server, tool_name, arguments)
+        return self._call_on_demand(server, request)
 
     def _call_via_socket(
         self,
         socket_path: Path,
-        tool_name: str,
-        arguments: dict[str, Any] | None,
-    ) -> Any:
+        request: CallToolRequestParams,
+    ) -> CallToolResult:
         """Call a tool via Unix socket (persistent mode).
 
         Args:
             socket_path: Path to the daemon's Unix socket.
-            tool_name: Tool name.
-            arguments: Tool arguments.
+            request: Tool call request params with name and arguments.
 
         Returns:
-            Tool result content.
+            Normalized tool result.
 
         Raises:
-            RuntimeError: If the tool call fails.
+            RuntimeError: If the socket communication fails.
         """
-        request = {
+        message = {
             "method": "call_tool",
-            "name": tool_name,
-            "arguments": arguments,
+            "name": request.name,
+            "arguments": request.arguments,
         }
 
         with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
             sock.connect(str(socket_path))
-            sock.sendall(json.dumps(request).encode() + b"\n")
+            sock.sendall(json.dumps(message).encode() + b"\n")
 
             # Read response (newline-delimited JSON)
             response_data = b""
@@ -142,34 +142,27 @@ class ToolRunner:
         response = json.loads(response_data.decode().strip())
 
         if "error" in response:
-            raise RuntimeError(response["error"])
+            # Return error as content
+            return CallToolResult(
+                content=[TextContent(type="text", text=response["error"])],
+                isError=True,
+            )
 
-        # Convert serialized content back to MCP types
-        content = []
-        for item in response.get("content", []):
-            if item.get("type") == "text":
-                content.append(TextContent(type="text", text=item["text"]))
-            else:
-                # For other types, return raw dict
-                content.append(item)
-
-        return content
+        return CallToolResult.model_validate(response)
 
     def _call_on_demand(
         self,
         server: str,
-        tool_name: str,
-        arguments: dict[str, Any] | None,
-    ) -> Any:
+        request: CallToolRequestParams,
+    ) -> CallToolResult:
         """Call a tool by spawning a new MCP server (on-demand mode).
 
         Args:
             server: Server name.
-            tool_name: Tool name.
-            arguments: Tool arguments.
+            request: Tool call request params with name and arguments.
 
         Returns:
-            Tool result content.
+            Normalized tool result.
         """
         # Get server config
         server_config = self.server_manager.get(server)
@@ -181,4 +174,4 @@ class ToolRunner:
             env=server_config.env or None,
         )
 
-        return asyncio.run(client.call_tool(tool_name, arguments))
+        return asyncio.run(client.call_tool_raw(request))
