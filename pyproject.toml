@@ -1,0 +1,101 @@
+[project]
+name = "nomcp"
+version = "0.1.0"
+description = "CLI interface for MCP servers - interact with MCP tools directly from the terminal"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "click>=8.1.0",
+    "pydantic>=2.0.0",
+    "mcp>=1.0.0",
+]
+
+# CLI entry point
+[project.scripts]
+nomcp = "nomcp.cli:main"
+
+# Build system - required for entry points to work
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["ruff>=0.9.6", "ty>=0.0.1"]
+
+# =============================================================================
+# Ruff Configuration - Linting & Formatting
+# https://docs.astral.sh/ruff/configuration/
+# =============================================================================
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+indent-width = 4
+
+# Exclude common directories
+exclude = [
+    ".git",
+    ".venv",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = [
+    # Core
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes (unused imports, undefined names)
+    "I",      # isort (import sorting)
+    # Best Practices
+    "B",      # flake8-bugbear (common bugs and design problems)
+    "SIM",    # flake8-simplify (simplify code)
+    "C90",    # mccabe complexity
+    "N",      # pep8-naming conventions
+    # Security
+    "S",      # flake8-bandit (security issues)
+    # Modernization
+    "UP",     # pyupgrade (modern Python syntax)
+    # Performance
+    "PERF",   # Perflint (performance anti-patterns)
+    # Code Quality
+    "RUF",    # Ruff-specific rules
+]
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "S101",   # Use of assert (fine in tests)
+]
+
+# Allow autofix for all enabled rules
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.mccabe]
+# Flag functions with cyclomatic complexity > 10
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use assert and have more relaxed rules
+"tests/**/*.py" = ["S101", "B011"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# =============================================================================
+# ty Configuration - Type Checking
+# https://docs.astral.sh/ty/configuration/
+# =============================================================================
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.rules]
+# Keep type checking strict but practical
+
+[tool.ty.src]
+# Respect .gitignore for file discovery
+respect-ignore-files = true
