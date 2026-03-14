@@ -1,4 +1,4 @@
-"""CLI entry point for mcp2cli."""
+"""CLI entry point for unmcp."""
 
 import json
 from datetime import datetime
@@ -8,7 +8,7 @@ from typing import Any
 import click
 from mcp.types import CallToolRequestParams, CallToolResult
 
-from mcp2cli import __version__
+from unmcp import __version__
 
 
 class DynamicServerGroup(click.Group):
@@ -21,7 +21,7 @@ class DynamicServerGroup(click.Group):
             return cmd
 
         # Check if it's a server name
-        from mcp2cli.utils import load_tools_cache
+        from unmcp.utils import load_tools_cache
 
         cache = load_tools_cache(cmd_name)
         if cache is None:
@@ -38,16 +38,23 @@ class DynamicServerGroup(click.Group):
                 return True
         return False
 
-    def _create_server_group(
-        self, server_name: str, cache: Any
-    ) -> click.Group:
+    def _create_server_group(self, server_name: str, cache: Any) -> click.Group:
         """Create a dynamic command group for a server."""
 
         @click.group(name=server_name, help=f"Tools for {server_name} server")
-        @click.option("--json", "json_output", is_flag=True, help="Output raw JSON response.")
-        @click.option("--output", "output_path", type=click.Path(), help="Write JSON result to file.")
+        @click.option(
+            "--json", "json_output", is_flag=True, help="Output raw JSON response."
+        )
+        @click.option(
+            "--output",
+            "output_path",
+            type=click.Path(),
+            help="Write JSON result to file.",
+        )
         @click.pass_context
-        def server_group(ctx: click.Context, json_output: bool, output_path: str | None) -> None:
+        def server_group(
+            ctx: click.Context, json_output: bool, output_path: str | None
+        ) -> None:
             if json_output and output_path:
                 raise click.UsageError("--json and --output are mutually exclusive.")
             ctx.ensure_object(dict)
@@ -76,7 +83,7 @@ class DynamicServerGroup(click.Group):
 
     def _create_tool_command(self, server_name: str, tool: Any) -> click.Command:
         """Create a Click command for a tool."""
-        from mcp2cli.services import ToolRunner
+        from unmcp.services import ToolRunner
 
         # Build parameters from input schema
         params, name_mapping = self._build_params_from_schema(tool.inputSchema)
@@ -89,7 +96,9 @@ class DynamicServerGroup(click.Group):
 
             # Resolve output_path if it's a directory
             if output_path:
-                output_path = self._resolve_output_path(output_path, server_name, tool.name)
+                output_path = self._resolve_output_path(
+                    output_path, server_name, tool.name
+                )
 
             runner = ToolRunner()
             try:
@@ -216,7 +225,7 @@ class DynamicServerGroup(click.Group):
         Returns:
             Tuple of (dump_path, threshold) if auto-dump triggered, (None, None) otherwise.
         """
-        from mcp2cli.config import load_settings
+        from unmcp.config import load_settings
 
         settings = load_settings()
         dump_threshold = settings.get_dump_threshold(server_name)
@@ -264,7 +273,7 @@ class DynamicServerGroup(click.Group):
         arguments: dict[str, Any],
     ) -> None:
         """Write result to file and print status message."""
-        from mcp2cli.config import load_settings
+        from unmcp.config import load_settings
 
         settings = load_settings()
         dump_call_args = settings.get_dump_call_args(server_name)
@@ -315,9 +324,9 @@ class DynamicServerGroup(click.Group):
         commands = list(super().list_commands(ctx))
 
         # Add initialized servers
-        from mcp2cli.config import get_mcp2cli_dir
+        from unmcp.config import get_unmcp_dir
 
-        servers_dir = get_mcp2cli_dir() / "servers"
+        servers_dir = get_unmcp_dir() / "servers"
         if servers_dir.exists():
             for path in servers_dir.glob("*.json"):
                 server_name = path.stem
@@ -328,9 +337,9 @@ class DynamicServerGroup(click.Group):
 
     def _get_server_names(self) -> list[str]:
         """Get list of initialized server names."""
-        from mcp2cli.config import get_mcp2cli_dir
+        from unmcp.config import get_unmcp_dir
 
-        servers_dir = get_mcp2cli_dir() / "servers"
+        servers_dir = get_unmcp_dir() / "servers"
         if not servers_dir.exists():
             return []
         return [p.stem for p in servers_dir.glob("*.json")]
@@ -350,36 +359,42 @@ class DynamicServerGroup(click.Group):
             return
 
         server_names = set(self._get_server_names())
-        builtin_cmds = [(name, cmd) for name, cmd in commands if name not in server_names]
+        builtin_cmds = [
+            (name, cmd) for name, cmd in commands if name not in server_names
+        ]
         server_cmds = [(name, cmd) for name, cmd in commands if name in server_names]
 
         # Built-in commands
         if builtin_cmds:
             with formatter.section("Commands"):
-                formatter.write_dl([
-                    (name, cmd.get_short_help_str(limit=formatter.width))
-                    for name, cmd in builtin_cmds
-                ])
+                formatter.write_dl(
+                    [
+                        (name, cmd.get_short_help_str(limit=formatter.width))
+                        for name, cmd in builtin_cmds
+                    ]
+                )
 
         # Server commands
         if server_cmds:
             with formatter.section("Servers"):
-                formatter.write_dl([
-                    (name, cmd.get_short_help_str(limit=formatter.width))
-                    for name, cmd in server_cmds
-                ])
+                formatter.write_dl(
+                    [
+                        (name, cmd.get_short_help_str(limit=formatter.width))
+                        for name, cmd in server_cmds
+                    ]
+                )
 
 
 @click.group(
     cls=DynamicServerGroup,
     epilog="""\
-Use 'mcp2cli clt --help' for server management.
+Use 'unmcp clt --help' for server management.
 
-Use 'mcp2cli <server> --help' for server tools.""",
+Use 'unmcp <server> --help' for server tools.""",
 )
-@click.version_option(version=__version__, prog_name="mcp2cli")
+@click.version_option(version=__version__, prog_name="unmcp")
 def main() -> None:
-    """mcp2cli - CLI interface for MCP servers."""
+    """unmcp - CLI interface for MCP servers."""
 
 
 # =============================================================================
@@ -400,7 +415,7 @@ def init(server: str, force: bool) -> None:
 
     SERVER is the name of the server defined in the config file.
     """
-    from mcp2cli.services import ServerManager
+    from unmcp.services import ServerManager
 
     manager = ServerManager()
 
@@ -431,7 +446,7 @@ def start(server: str) -> None:
 
     SERVER is the name of the server defined in the config file.
     """
-    from mcp2cli.services import ServerManager
+    from unmcp.services import ServerManager
 
     manager = ServerManager()
 
@@ -440,7 +455,10 @@ def start(server: str) -> None:
         raise SystemExit(1)
 
     if not manager.is_initialized(server):
-        click.echo(f"Error: Server '{server}' not initialized. Run: mcp2cli clt init {server}", err=True)
+        click.echo(
+            f"Error: Server '{server}' not initialized. Run: unmcp clt init {server}",
+            err=True,
+        )
         raise SystemExit(1)
 
     try:
@@ -461,7 +479,7 @@ def stop(server: str) -> None:
 
     SERVER is the name of the server to stop.
     """
-    from mcp2cli.services import ServerManager
+    from unmcp.services import ServerManager
 
     manager = ServerManager()
 
@@ -474,7 +492,7 @@ def stop(server: str) -> None:
 @clt.command(name="list")
 def list_servers() -> None:
     """List configured MCP servers."""
-    from mcp2cli.services import ServerManager
+    from unmcp.services import ServerManager
 
     manager = ServerManager()
 

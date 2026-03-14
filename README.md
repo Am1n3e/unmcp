@@ -1,4 +1,4 @@
-# mcp2cli
+# unmcp
 
 **Skip MCP. Enjoy CLI.**
 
@@ -9,23 +9,23 @@ Use MCP server tools directly from your terminal. Perfect for scripting, automat
 ## Quick Start
 
 ```bash
-# 1. Configure your MCP servers in .mcp2cli/.mcp.json
+# 1. Configure your MCP servers in .unmcp/.mcp.json
 # 2. Initialize a server (discovers available tools)
-uvx mcp2cli clt init <server>
+uvx unmcp clt init <server>
 
 # 3. Call tools directly
-uvx mcp2cli <server> <tool> [OPTIONS]
+uvx unmcp <server> <tool> [OPTIONS]
 ```
 
-## Why mcp2cli?
+## Why unmcp?
 
 MCP servers offer powerful, structured tools. But the MCP protocol loads large tool schemas and verbose data into AI context—expensive in tokens, slow in practice.
 
 CLI is leaner. It avoids loading tool schemas and verbose outputs into model context.
 
-mcp2cli gives you direct CLI access to MCP server tools. Same tools, no protocol overhead.
+unmcp gives you direct CLI access to MCP server tools. Same tools, no protocol overhead.
 
-Not every MCP server has an official CLI. Rather than waiting, mcp2cli lets you use existing MCP servers as CLIs right now.
+Not every MCP server has an official CLI. Rather than waiting, unmcp lets you use existing MCP servers as CLIs right now.
 
 See [Playwright CLI vs MCP](https://github.com/microsoft/playwright-mcp#cli-mode-vs-mcp-mode) for a similar motivation.
 
@@ -34,10 +34,10 @@ See [Playwright CLI vs MCP](https://github.com/microsoft/playwright-mcp#cli-mode
 ### Server Management
 
 ```bash
-uvx mcp2cli clt init <server>      # Initialize and discover tools (--force to reinitialize)
-uvx mcp2cli clt list               # List servers with status
-uvx mcp2cli clt start <server>     # Start persistent daemon
-uvx mcp2cli clt stop <server>      # Stop daemon
+uvx unmcp clt init <server>      # Initialize and discover tools (--force to reinitialize)
+uvx unmcp clt list               # List servers with status
+uvx unmcp clt start <server>     # Start persistent daemon
+uvx unmcp clt stop <server>      # Stop daemon
 ```
 
 ### Calling Tools
@@ -46,22 +46,22 @@ Argument names match the MCP tool schema exactly (e.g., `libraryId` becomes `--l
 
 ```bash
 # Basic call
-uvx mcp2cli <server> <tool> --arg1 "value"
+uvx unmcp <server> <tool> --arg1 "value"
 
 # Output as JSON (flag before tool name)
-uvx mcp2cli <server> --json <tool> --arg1 "value"
+uvx unmcp <server> --json <tool> --arg1 "value"
 
 # Save to file (flag before tool name)
-uvx mcp2cli <server> --output result.json <tool> --arg1 "value"
+uvx unmcp <server> --output result.json <tool> --arg1 "value"
 
 # Save to directory (auto-generates filename: {server}_{tool}_{timestamp}.json)
-uvx mcp2cli <server> --output ./output_dir/ <tool> --arg1 "value"
+uvx unmcp <server> --output ./output_dir/ <tool> --arg1 "value"
 
 # View available tools
-uvx mcp2cli <server> --help
+uvx unmcp <server> --help
 
 # View tool options
-uvx mcp2cli <server> <tool> --help
+uvx unmcp <server> <tool> --help
 ```
 
 ## Execution Modes
@@ -74,7 +74,7 @@ Each tool call spawns a new MCP server, executes the tool, and exits.
 
 ```mermaid
 sequenceDiagram
-    participant CLI as uvx mcp2cli
+    participant CLI as uvx unmcp
     participant MCP as MCP Server
 
     CLI->>MCP: spawn process
@@ -91,30 +91,30 @@ A daemon process keeps the MCP server running. Tool calls connect via Unix socke
 
 ```mermaid
 sequenceDiagram
-    participant CLI as uvx mcp2cli
+    participant CLI as uvx unmcp
     participant D as Daemon
     participant MCP as MCP Server
 
-    Note over CLI,MCP: uvx mcp2cli clt start
+    Note over CLI,MCP: uvx unmcp clt start
     D->>MCP: spawn & initialize
     D->>D: listen on socket
 
-    Note over CLI,MCP: uvx mcp2cli <server> <tool>
+    Note over CLI,MCP: uvx unmcp <server> <tool>
     CLI->>D: call via socket
     D->>MCP: call_tool()
     MCP-->>D: result
     D-->>CLI: result
 
-    Note over CLI,MCP: uvx mcp2cli clt stop
+    Note over CLI,MCP: uvx unmcp clt stop
     CLI->>D: shutdown
     D->>MCP: close
 ```
 
 ## Configuration
 
-### MCP Servers Config (`.mcp2cli/.mcp.json`)
+### MCP Servers Config (`.unmcp/.mcp.json`)
 
-Follows the standard MCP config format. Add as many servers as needed (local or global at `~/.mcp2cli/.mcp.json`):
+Follows the standard MCP config format. Add as many servers as needed (local or global at `~/.unmcp/.mcp.json`):
 
 ```json
 {
@@ -137,11 +137,11 @@ Follows the standard MCP config format. Add as many servers as needed (local or 
 
 Automatically save large outputs to files, keeping Agent context (and your terminal) clean.
 
-Configure in `.mcp2cli/.settings.json`:
+Configure in `.unmcp/.settings.json`:
 
 ```json
 {
-  "dump_dir": "mcp2cli_output",
+  "dump_dir": "unmcp_output",
   "servers": {
     "context7": {
       "dump_threshold": 500
@@ -177,7 +177,7 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 ### Setup
 
 ```json
-// .mcp2cli/.mcp.json
+// .unmcp/.mcp.json
 {
   "mcpServers": {
     "context7": {
@@ -189,7 +189,7 @@ Can also be set per-server via `servers.<name>.dump_call_args`.
 ```
 
 ```json
-// .mcp2cli/.settings.json
+// .unmcp/.settings.json
 {
   "servers": {
     "context7": {
@@ -206,15 +206,15 @@ We use on-demand mode here since Context7 doesn't hold meaningful state between 
 
 ```bash
 # Initialize
-uvx mcp2cli clt init context7
+uvx unmcp clt init context7
 
 # Query docs - automatically saved to feature-x-tmp/
-uvx mcp2cli context7 --output feature-x-tmp query-docs --libraryId "/vercel/next.js" --query "app router"
+uvx unmcp context7 --output feature-x-tmp query-docs --libraryId "/vercel/next.js" --query "app router"
 ```
 
 ```
-$ uvx mcp2cli context7 --help
-Usage: mcp2cli context7 [OPTIONS] COMMAND [ARGS]...
+$ uvx unmcp context7 --help
+Usage: unmcp context7 [OPTIONS] COMMAND [ARGS]...
 
   Tools for context7 server
 
@@ -229,7 +229,7 @@ Commands:
 ```
 
 ```
-$ uvx mcp2cli context7 --output feature-x-tmp query-docs --libraryId /vercel/next.js --query "How to set up authentication with JWT"
+$ uvx unmcp context7 --output feature-x-tmp query-docs --libraryId /vercel/next.js --query "How to set up authentication with JWT"
 Tool executed successfully.
 Tool output written to: feature-x-tmp/context7_query-docs_20260131_194608.json
 ```
@@ -268,8 +268,8 @@ Tool output written to: feature-x-tmp/context7_query-docs_20260131_194608.json
 With `dump_call_args: true`, the output includes the exact tool call arguments. This turns output files into a cache that AI agents can refer back to—no need to re-fetch the same documentation during a session.
 
 ```
-$ uvx mcp2cli context7 query-docs --help
-Usage: mcp2cli context7 query-docs [OPTIONS]
+$ uvx unmcp context7 query-docs --help
+Usage: unmcp context7 query-docs [OPTIONS]
 
   Retrieves and queries up-to-date documentation and code examples from
   Context7 for any programming library or framework.

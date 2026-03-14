@@ -40,5 +40,5 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# mcp2cli runtime data
-.mcp2cli/
+# unmcp runtime data
+.unmcp/

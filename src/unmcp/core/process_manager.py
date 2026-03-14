@@ -6,8 +6,8 @@ import os
 import signal
 from pathlib import Path
 
-from mcp2cli.config import PROCESSES_DIR, get_mcp2cli_dir
-from mcp2cli.models import ProcessInfo
+from unmcp.config import PROCESSES_DIR, get_unmcp_dir
+from unmcp.models import ProcessInfo
 
 
 class ProcessManager:
@@ -15,7 +15,7 @@ class ProcessManager:
 
     def __init__(self) -> None:
         """Initialize process manager."""
-        self._processes_dir = get_mcp2cli_dir() / PROCESSES_DIR
+        self._processes_dir = get_unmcp_dir() / PROCESSES_DIR
 
     def _get_process_path(self, name: str) -> Path:
         """Get the path to a process file."""
