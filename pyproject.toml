@@ -1,5 +1,5 @@
 [project]
-name = "mcp2cli"
+name = "mcp2cli-py"
 version = "0.1.0"
 description = "CLI interface for MCP servers - interact with MCP tools directly from the terminal"
 readme = "README.md"
