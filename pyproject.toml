@@ -1,5 +1,5 @@
 [project]
-name = "mcp2cli-py"
+name = "unmcp"
 version = "0.1.0"
 description = "CLI interface for MCP servers - interact with MCP tools directly from the terminal"
 readme = "README.md"
@@ -12,7 +12,7 @@ dependencies = [
 
 # CLI entry point
 [project.scripts]
-mcp2cli = "mcp2cli.cli:main"
+unmcp = "unmcp.cli:main"
 
 # Build system - required for entry points to work
 [build-system]

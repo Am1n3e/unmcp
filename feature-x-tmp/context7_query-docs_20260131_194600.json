@@ -1,0 +1,19 @@
+{
+  "tool_call": {
+    "server": "context7",
+    "tool": "query-docs",
+    "arguments": {
+      "libraryId": "/vercel/next.js",
+      "query": "how to use console.log"
+    }
+  },
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "### Example client-side component with console log in Next.js\n\nSource: https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/05-config/01-next-config-js/logging.mdx\n\nThis React component demonstrates a client-side interaction that triggers a `console.log` message. When `browserToTerminal` is enabled, this log will appear in the development terminal, along with its source location.\n\n```tsx\n'use client'\n\nexport default function Home() {\n  return (\n    <button\n      type=\"button\"\n      onClick={() => {\n        console.log('Hello World')\n      }}\n    >\n      Click me\n    </button>\n  )\n}\n```\n\n--------------------------------\n\n### Enable forwarding browser console logs to terminal in Next.js\n\nSource: https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/05-config/01-next-config-js/logging.mdx\n\nThis configuration forwards all browser console logs (log, info, warn, error) to the terminal during development. It simplifies debugging client-side code by centralizing log output without needing to inspect browser developer tools.\n\n```javascript\nmodule.exports = {\n  logging: {\n    browserToTerminal: true,\n  },\n}\n```\n\n--------------------------------\n\n### Example terminal output for forwarded browser console log\n\nSource: https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/05-config/01-next-config-js/logging.mdx\n\nThis snippet shows the expected output in the development terminal when a browser `console.log` is forwarded. It includes the `[browser]` prefix and the source file path and line number, aiding in quick debugging.\n\n```bash\n[browser] Hello World (app/page.tsx:8:17)\n```\n\n### Options > Browser Console Logs\n\nSource: https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/05-config/01-next-config-js/logging.mdx\n\nYou can forward browser console logs (such as `console.log`, `console.warn`, `console.error`) to the terminal during development. This is useful for debugging client-side code without needing to check the browser's developer tools. The `browserToTerminal` option accepts values like `'warn'` (forward only warnings and errors by default), `'error'` (forward only errors), `true` (forward all console output), or `false` (disable browser log forwarding).\n\n--------------------------------\n\n### Options > Browser Console Logs > Source Location\n\nSource: https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/05-config/01-next-config-js/logging.mdx\n\nWhen browser log forwarding is enabled, browser logs include source location information (file path and line number) by default. For example, when a `console.log` statement is executed in the browser, it prints to the terminal with the format `[browser] message (file:line:column)`, making it easy to trace where the log originated in your source code."
+      }
+    ],
+    "isError": false
+  }
+}

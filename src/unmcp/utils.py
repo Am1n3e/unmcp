@@ -1,12 +1,12 @@
-"""Utility functions for mcp2cli."""
+"""Utility functions for unmcp."""
 
 import json
 import re
 import shutil
 import subprocess
 
-from mcp2cli.config import get_tools_cache_path
-from mcp2cli.models import ToolsCache
+from unmcp.config import get_tools_cache_path
+from unmcp.models import ToolsCache
 
 
 def _extract_package_name(args: list[str]) -> str | None:

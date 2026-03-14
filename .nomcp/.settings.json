@@ -1,0 +1,10 @@
+{
+  "dump_dir": "docs_output",
+  "dump_threshold": 500,
+  "servers": {
+    "context7": {
+      "dump_threshold": 500,
+      "dump_call_args": true
+    }
+  }
+}

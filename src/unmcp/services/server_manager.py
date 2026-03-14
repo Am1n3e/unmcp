@@ -10,16 +10,16 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from mcp2cli.config import (
+from unmcp.config import (
     LOGS_DIR,
     find_mcp_config_file,
-    get_mcp2cli_dir,
     get_socket_path,
+    get_unmcp_dir,
     load_mcp_config,
 )
-from mcp2cli.core import MCPClient, ProcessManager
-from mcp2cli.models import MCPServerConfig, ProcessInfo, ToolsCache
-from mcp2cli.utils import get_package_version, load_tools_cache, save_tools_cache
+from unmcp.core import MCPClient, ProcessManager
+from unmcp.models import MCPServerConfig, ProcessInfo, ToolsCache
+from unmcp.utils import get_package_version, load_tools_cache, save_tools_cache
 
 
 class InitResult(BaseModel):
@@ -174,13 +174,13 @@ class ServerManager:
         process_env = os.environ.copy()
         if server_config.env:
             # Pass server env to daemon via special env var
-            process_env["MCP2CLI_DAEMON_ENV"] = json.dumps(server_config.env)
+            process_env["UNMCP_DAEMON_ENV"] = json.dumps(server_config.env)
 
         # Socket path for this daemon
         socket_path = get_socket_path(name)
 
         # Log file for daemon stderr
-        log_dir = get_mcp2cli_dir() / LOGS_DIR
+        log_dir = get_unmcp_dir() / LOGS_DIR
         log_dir.mkdir(parents=True, exist_ok=True)
         log_file = log_dir / f"{name}.log"
 
