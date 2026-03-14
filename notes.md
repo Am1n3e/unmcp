@@ -1,3 +1,0 @@
-- add sync time to servers
-- use pydantic settings for config management
-- add skill.md generation
